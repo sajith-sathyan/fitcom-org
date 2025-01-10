@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workout-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: workout-service
+  template:
+    metadata:
+      labels:
+        app: workout-service
+    spec:
+      containers:
+      - name: workout-service
+        image: 619071337012.dkr.ecr.ap-south-1.amazonaws.com/sample-microservice-workout
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000

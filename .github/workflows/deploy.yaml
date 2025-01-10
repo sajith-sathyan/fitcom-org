@@ -1,0 +1,61 @@
+name: Node.js App Deploy to EKS
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    env:
+      ECR_REGISTRY: 619071337012.dkr.ecr.ap-south-1.amazonaws.com
+      AWS_REGION: ap-south-1
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v2.0
+        with:
+          version: 'v1.24.0'
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build, tag, and push user-service image
+        run: |
+          IMAGE_TAG=${{ github.sha }}
+          docker build -t ${{ env.ECR_REGISTRY }}/sample-microservice-user:latest ./user
+          docker tag ${{ env.ECR_REGISTRY }}/sample-microservice-user:latest ${{ env.ECR_REGISTRY }}/sample-microservice-user:${IMAGE_TAG}
+          docker push ${{ env.ECR_REGISTRY }}/sample-microservice-user:${IMAGE_TAG}
+
+      - name: Build, tag, and push workout-service image
+        run: |
+          IMAGE_TAG=${{ github.sha }}
+          docker build -t ${{ env.ECR_REGISTRY }}/sample-microservice-workout:latest ./workout
+          docker tag ${{ env.ECR_REGISTRY }}/sample-microservice-workout:latest ${{ env.ECR_REGISTRY }}/sample-microservice-workout:${IMAGE_TAG}
+          docker push ${{ env.ECR_REGISTRY }}/sample-microservice-workout:${IMAGE_TAG}
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name sampleMicroservice --region ${{ env.AWS_REGION }}
+
+      - name: Deploy user-service to EKS
+        run: |
+          kubectl apply -f k8s/user-deployment.yaml
+          kubectl apply -f k8s/user-service.yaml
+
+      - name: Deploy workout-service to EKS
+        run: |
+          kubectl apply -f k8s/workout-deployment.yaml
+          kubectl apply -f k8s/workout-service.yaml
